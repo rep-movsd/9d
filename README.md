@@ -2,14 +2,14 @@
 Complete software suite for the nand2tetris MOOC course
 
 
-## Intro
+### Intro
 The nand2tetris MOOC is a challenging course that teaches how to build a computer from ground up, using logic gates all the way upto the software stack, including a compiler and a rudimentary OS.
 
 The course is quite old, and the software tools that they provide feel a bit dated. We aim to build an alternative suite that will help students of this course.
 
 Beyond the course itself, it can serve as a playground to test various ideas for programming languages, CPU architecture etc. within the limits of the course tooling specifications.
 
-# Features
+### Features
 
 nand2tetris has several tools:
 

@@ -30,4 +30,20 @@ Several ideas to implement:
  * JACK VM to native x86 compilation
  
  
+### Collaboration model
+
+Until I am aware of any collaborators competence, all architectural and platform considerations are solely decided by me.
+There are some collaborators whose judgement I trust enough to let them architect things.
+
+My job will be to create task based issues and let people pick what they feel confident of doing. If any task takes too long, someone else can step in.
+
+There is bound to be a lot of code churn and rewriting involved in such a large project. Until specified, treat your code as likely to be re-architected (or rewritten).
+
+The language and platform will be C++ with QT (or perhaps CopperSpice?)
+
+Scripting and codegen tools can be in python or JS etc.
+
+
+
+
 

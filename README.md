@@ -1,5 +1,5 @@
 # 9d
-Complete software suite for the nand2tetris MOOC course
+Complete software suite for the [nand2tetris](http://nand2tetris.org/) [MOOC](https://www.coursera.org/learn/build-a-computer) course
 
 
 ### Intro

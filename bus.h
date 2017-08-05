@@ -5,11 +5,12 @@ using std::vector;
 // We will use 1 and 0 for bools rather than -1 and 0
 using Bit = int;
 
+
 // Bus is an abstraction of a unidirectional signal carrier
 // It carries a signal to one or more endpoints
 // Endpoints (of type Pin) are actually callbacks that are registered by a gate
 // The input signal is set by a funtion set_signal()
-// TYhe number of bits carried is the bitwidth of the Signal template param
+// TYhe number of bits carried is the dependent on the  Signal template param
 template<typename Signal>
 class Bus
 {
@@ -27,7 +28,12 @@ public:
   }
   
   // Use >> to connect things
-  Bus& operator>>(Pin &pin) { return connect(pin); }
+  // Add a new pin that will be called whenever the signal is updated.
+  Bus& operator>>(Pin &pin) 
+  { 
+    m_arrPins.push_back(pin); 
+    return *this;
+  }
   
 private:
   
@@ -37,13 +43,6 @@ private:
   // List of pins  associated with this wire
   vector<Pin> m_arrPins;
     
-  // Add a new pin that will be called whenever the signal is updated.
-  Bus& connect(Pin& pin) 
-  { 
-    m_arrPins.push_back(pin); 
-    return *this;
-  }
-  
   // Feed the signal to each pin
   void feed_pins()
   {

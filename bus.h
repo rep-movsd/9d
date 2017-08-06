@@ -10,7 +10,7 @@ using Bit = int;
 // It carries a signal to one or more endpoints
 // Endpoints (of type Pin) are actually callbacks that are registered by a gate
 // The input signal is set by a funtion set_signal()
-// TYhe number of bits carried is the dependent on the  Signal template param
+// The number of bits carried is the dependent on the  Signal template param
 template<typename Signal>
 class Bus
 {

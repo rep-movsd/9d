@@ -1,7 +1,5 @@
 #pragma once
 
-#define LUT(m, n) arrTruthTable[m][n] = o ## m ## n;
-    
 // Gate is an abstraction of a 2->1 boolean gate
 // Specify 4 template params as the truth table.
 template<Bit o00, Bit o01, Bit o10, Bit o11> struct gate
@@ -10,7 +8,7 @@ template<Bit o00, Bit o01, Bit o10, Bit o11> struct gate
   
 private: 
   Bit inA = 0, inB = 0;
-  Bit arrTruthTable[2][2];
+  const Bit arrTruthTable[2][2] = {{o00, o01}, {o10, o11}};
   
   Pin make_pin(Bit *pBit)
   {
@@ -26,14 +24,6 @@ private:
   
 public: 
   Wire out;
-  Pin a;
-  Pin b;
-  
-  gate(): a(make_pin(&inA)), b(make_pin(&inB))
-  {
-    LUT(0, 0);
-    LUT(0, 1);
-    LUT(1, 0);
-    LUT(1, 1);
-  }
+  Pin a, b;
+  gate(): a(make_pin(&inA)), b(make_pin(&inB)) {}
 };

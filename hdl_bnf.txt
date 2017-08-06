@@ -1,0 +1,66 @@
+chip_description ::=
+    "CHIP" chip_name "{"
+        "IN" input_pin_list         ";"
+        "OUT" output_pin_list       ";"
+        maybe_builtin_chip_list     ";"
+        maybe_clocked_pin_list      ";"
+        "PARTS" ":" parts_list
+    "}" .
+
+chip_name ::=    IDENTIFIER .
+
+input_pin_list ::=
+        input_pin_list pin_name
+    |   pin_name .
+
+output_pin_list ::=
+        output_pin_list pin_name
+    |   pin_name .
+
+maybeclocked_pin_list ::=
+        "CLOCKED"   clocked_pin_list
+    |   .
+
+clocked_pin_list ::=
+        clocked_pin_list unsubscripted_pin_name
+    |   unsubscripted_pin_name .
+
+maybe_builtin_chip_list ::=
+        "BUILTIN"   builtin_chip_list;
+    |   .
+
+builtin_chip_list ::=
+        builtin_chip_list chip_name
+    |   chip_name .
+
+parts_list ::=
+        parts_list internal_chip_part
+    |   internal_chip_part .
+
+internal_chip_part ::=
+        chip_name "(" connection_list ")" .
+
+connection_list ::=
+        connection_list "," connection
+    |   connection .
+
+connection ::=
+        subscripted_pin_name "=" unsubscripted_pin_name .
+               // Which chip (parent or part), internal or in/out will be
+               // determined later by walking the tree
+
+subscripted_pin_name ::=
+        unsubscripted_pin_name
+    |   unsubscripted_pin_name "[" range "]" .
+
+range ::=
+        UNSIGNED_INT
+    |   UNSIGNED_INT ".." UNSIGNED_INT
+
+pin_name ::=
+        unsubscripted_pin_name                          // 1-bit
+    |   unsubscripted_pin_name bitwidth_subscript .     // Bus
+
+bitwidth_subscript ::= "[" UNSIGNED_INT "]" .
+
+unsubscripted_pin_name ::= IDENTIFIER .

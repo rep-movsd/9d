@@ -56,7 +56,7 @@ int Scanner::next() {
         }
     }
 
-    if ((mode & SCAN_COMMENTS) && *p == '/' && (p + 1) != e && p[1] == '/') {
+    if (((mode & SCAN_COMMENTS) || (mode & SKIP_COMMENTS)) && *p == '/' && (p + 1) != e && p[1] == '/') {
         token_start = p - _text.data();
         while (p != e && *p != '\n') {
             ++p;
@@ -69,7 +69,12 @@ int Scanner::next() {
             col = 1;
             ++line;
         }
-        SET_TOK_AND_RET(COMMENT);
+
+        if ((mode & SCAN_COMMENTS)) {
+            SET_TOK_AND_RET(COMMENT);
+        } else {
+            return next();
+        }
     }
 
     if (*p == '"' && (mode & SCAN_STRINGS)) {

@@ -27,10 +27,11 @@ enum Modes {
     SCAN_SPACES = 1 << -SPACE,     // Scan white spaces
     SCAN_COMMENTS = 1 << -COMMENT, // Scan comments
     SCAN_ESCAPES = 1 << -ESCAPE,   // This will inteprete escape codes all throughout the string
+    SKIP_COMMENTS = 1 << 31        // Ignore comments
 };
 
 /// This default mode is like scanning most simple languages
-const int DEFAULT_MODE = SCAN_INTS | SCAN_FLOATS | SCAN_STRINGS | SCAN_IDENTS;
+const int DEFAULT_MODE = SCAN_INTS | SCAN_FLOATS | SCAN_STRINGS | SCAN_IDENTS | SKIP_COMMENTS;
 
 /// This mode treats the whole text as if being inside a string literal. It
 /// scans characters one by one and also interpretes escape code

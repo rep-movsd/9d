@@ -1,40 +1,22 @@
+#include "config.h"
 #include "scanner.h"
 
-#include <experimental/filesystem>
+#include <stdarg.h>
 #include <string.h>
+#include <exception>
 
-namespace fs = std::experimental::filesystem;
-
-#define ARRAY_SIZE(a) sizeof(a) / sizeof(a[0])
+constexpr int MAX_SUBSCRIPT = 1024;
 
 // Read a text file into a vector of chars
-void read_file(const fs::path &path, std::vector<char> &dest) {
-    auto path_str8 = path.u8string();
-
-    if (!fs::exists(path)) {
-        fprintf(stderr, "File: %s does not exist", path_str8.c_str());
-        abort();
+void read_file(const char *path, std::vector<char> &dest) {
+    if (FILE *fp = fopen(path, "r")) {
+        char buf[1024];
+        while (size_t len = fread(buf, 1, sizeof(buf), fp))
+            dest.insert(dest.end(), buf, buf + len);
+        fclose(fp);
+    } else {
+        fprintf(stderr, "Unexpected error - could not open file %s", path);
     }
-
-    FILE *f = fopen(path_str8.c_str(), "rb");
-
-    if (f == nullptr) {
-        fprintf(stderr, "Unexpected error - could not open file %s", path.c_str());
-        abort();
-    }
-
-    const size_t size = fs::file_size(path);
-
-    dest.clear();
-    dest.resize(size);
-
-    size_t read_count = fread(dest.data(), 1, size, f);
-    if (read_count != size) {
-        fprintf(stderr, "Failed to read full file: %s", path_str8.c_str());
-        abort();
-    }
-
-    fclose(f);
 }
 
 static const char *KEYWORD_LIST[] = {"CHIP", "IN", "OUT", "PARTS", "CLOCKED", "PARTS", "BUILTIN"};
@@ -42,7 +24,7 @@ static const char *KEYWORD_LIST[] = {"CHIP", "IN", "OUT", "PARTS", "CLOCKED", "P
 struct Parser {
     scanner::Scanner sc;
     Parser(std::vector<char> s)
-        : sc(std::move(s), scanner::DEFAULT_MODE | scanner::SCAN_COMMENTS) {}
+        : sc(std::move(s), scanner::DEFAULT_MODE) {}
 
     static bool is_keyword(const std::string &token_text) {
         for (size_t i = 0; i < ARRAY_SIZE(KEYWORD_LIST); ++i) {
@@ -53,29 +35,282 @@ struct Parser {
         }
     }
 
-    void parse() {
-        std::string token_str;
-        while (sc.next() != scanner::EOFS) {
-            token_str.clear();
-            switch (sc.current_tok) {
-            case scanner::IDENT:
-                sc.token_text(token_str);
-                printf("%s: %s\n", is_keyword(token_str) ? "Keyword" : "Identifier", token_str.c_str());
-                break;
+    struct Range {
+        int start;
+        int end; // inclusive. start == end for 1 channel input or output
+    };
 
-            case scanner::INT:
-                printf("INT: %li\n", sc.current_int);
-                break;
+    using UnsubscriptedPin = std::string;
 
-            case scanner::COMMENT:
-                sc.token_text(token_str);
-                printf("COMMENT: %s\n", token_str.c_str());
-                break;
+    struct MaybeSubscriptedEndpoint {
+        UnsubscriptedPin pin;
+        optional<Range> subscript;
+    };
 
-            default:
-                printf("default: %s\n", scanner::desc(sc.current_tok));
+    struct Connection {
+        MaybeSubscriptedEndpoint left;
+        MaybeSubscriptedEndpoint right;
+    };
+
+    struct Part {
+        std::string chip;
+        std::vector<Connection> connections;
+    };
+
+    using PartsList = std::vector<Part>;
+
+    using ChipName = std::string;
+
+    using BuiltinChipsList = std::vector<ChipName>;
+    using ClockedPinList = std::vector<UnsubscriptedPin>;
+
+    struct PinDeclaration {
+        std::string pin;
+        uint32_t width = 1;
+    };
+
+    struct Chip {
+        std::string name;
+        std::vector<PinDeclaration> in_pins;
+        std::vector<PinDeclaration> out_pins;
+        std::vector<Part> parts;
+        BuiltinChipsList builtin_chips;
+        ClockedPinList clocked_pins;
+    };
+
+    Chip parse() {
+        sc.next();
+        return chip();
+    }
+
+    void error(const char *fmt, ...) {
+        char buf[1024] = {};
+        va_list va;
+        va_start(va, fmt);
+        int count = snprintf(buf, sizeof(buf), "hdl parse error: Line: %i, Col: %i\n\t", sc.line, sc.col);
+        vsnprintf(buf + count, sizeof(buf) - count, fmt, va);
+        va_end(va);
+
+        fprintf(stderr, "%s: ", buf);
+        throw std::runtime_error(std::string(buf));
+    }
+
+    void expect(int token) {
+        if (token != sc.current_tok) {
+            const char *desc;
+            char b[2] = {};
+            if (token < 0) {
+                desc = scanner::desc(token);
+            } else {
+                b[1] = (char)token;
+                desc = b;
             }
+            error("Expected: %s", b);
         }
+    }
+
+    void skip(int c) {
+        if (sc.current_tok != c) {
+            error("Expected: '%c'", (char)c);
+        }
+        sc.next();
+    }
+
+    Chip chip() {
+        Chip c;
+
+        auto skip_keyword = [this](const char *keyword) {
+            if (!check_keyword(keyword)) {
+                error((std::string("Expected keyword ") + keyword).c_str());
+            }
+            sc.next();
+        };
+
+        skip_keyword("CHIP");
+
+        c.name = identifier();
+
+        skip('{');
+
+        skip_keyword("IN");
+
+        c.in_pins = in_or_out_pin_decls();
+
+        skip_keyword("OUT");
+
+        c.out_pins = in_or_out_pin_decls();
+        c.builtin_chips = maybe_builtin_chip_list();
+        c.clocked_pins = maybe_clocked_pin_list();
+
+        skip_keyword("PARTS");
+        skip(':');
+
+        c.parts = parts_list();
+
+        skip('}');
+
+        if (sc.current_tok != scanner::EOFS) {
+            error("Expected EOF");
+        }
+
+        return c;
+    }
+
+    std::vector<PinDeclaration> in_or_out_pin_decls() {
+        std::vector<PinDeclaration> decls;
+        decls.push_back(pin_declaration());
+        while (sc.current_tok == ',') {
+            sc.next();
+            decls.push_back(pin_declaration());
+        }
+        skip(';');
+        return decls;
+    }
+
+    PinDeclaration pin_declaration() {
+        PinDeclaration p;
+        p.pin = unsubscripted_endpoint();
+        if (sc.current_tok == '[') {
+            sc.next();
+            p.width = integer();
+            skip(']');
+        }
+        return p;
+    }
+
+    ClockedPinList maybe_clocked_pin_list() {
+        if (!check_keyword("CLOCKED")) {
+            return ClockedPinList();
+        }
+        sc.next();
+        return clocked_pin_list();
+    }
+
+    ClockedPinList clocked_pin_list() {
+        ClockedPinList pins;
+        pins.push_back(identifier());
+        while (sc.current_tok == ',') {
+            sc.next();
+            pins.push_back(identifier());
+        }
+        skip(';');
+        return pins;
+    }
+
+    BuiltinChipsList maybe_builtin_chip_list() {
+        if (!check_keyword("BUILTIN")) {
+            return BuiltinChipsList();
+        }
+        sc.next();
+        return builtin_chips_list();
+    }
+
+    BuiltinChipsList builtin_chips_list() {
+        BuiltinChipsList chips;
+        chips.push_back(identifier());
+        while (sc.current_tok == ',') {
+            sc.next();
+            chips.push_back(identifier());
+        }
+        skip(';');
+        return chips;
+    }
+
+    std::string identifier() {
+        expect(scanner::IDENT);
+        std::string s;
+        sc.token_text(s);
+
+        if (is_keyword(s)) {
+            error("Expected identifier, found keyword");
+        }
+        sc.next();
+
+        return s;
+    }
+
+    bool check_keyword(const char *keyword) {
+        if (sc.current_tok != scanner::IDENT) {
+            return false;
+        }
+        std::string s;
+        sc.token_text(s);
+
+        return strcmp(s.c_str(), keyword) == 0;
+    }
+
+    PartsList parts_list() {
+        PartsList v;
+        v.push_back(part());
+
+        skip(';');
+
+        while (sc.current_tok == scanner::IDENT) {
+            v.push_back(part());
+            skip(';');
+        }
+        return v;
+    }
+
+    Part part() {
+        expect(scanner::IDENT);
+        Part p;
+        sc.token_text(p.chip);
+
+        sc.next();
+        skip('(');
+        p.connections = connection_list();
+        skip(')');
+        return p;
+    }
+
+    std::vector<Connection> connection_list() {
+        std::vector<Connection> v;
+        v.push_back(connection());
+        while (sc.current_tok == ',') {
+            sc.next();
+            v.push_back(connection());
+        }
+        return v;
+    }
+
+    Connection connection() {
+        Connection conn;
+        conn.left = maybe_subscripted_endpoint();
+        skip('=');
+        conn.right = maybe_subscripted_endpoint();
+    }
+
+    MaybeSubscriptedEndpoint maybe_subscripted_endpoint() {
+        auto pin = unsubscripted_endpoint();
+        if (sc.current_tok != '[') {
+            return MaybeSubscriptedEndpoint{pin, nullopt};
+        }
+        sc.next();
+        Range r = {};
+        r.start = integer();
+        if (sc.current_tok == '.') {
+            sc.next();
+            skip('.');
+            r.end = integer();
+            skip(']');
+        } else if (sc.current_tok == ']') {
+            sc.next();
+            r.end = r.start;
+        }
+        return MaybeSubscriptedEndpoint{pin, r};
+    }
+
+    UnsubscriptedPin unsubscripted_endpoint() { return identifier(); }
+
+    int integer() {
+        expect(scanner::INT);
+        if (sc.current_int < 0 || sc.current_int >= MAX_SUBSCRIPT) {
+            error("Expected positive integer in valid range");
+        }
+        int n = sc.current_int;
+        sc.next();
+        return n;
     }
 };
 

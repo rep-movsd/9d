@@ -9,7 +9,12 @@ Scanner::Scanner(std::vector<char> text, int mode)
     , col(1)
     , offset(0)
     , token_start(-1)
-    , current_tok(INVALID) {}
+    , current_tok(INVALID) {
+    // Need this since we're using strtod to parse doubles
+    if (_text.back() != '\0') {
+        _text.push_back('\0');
+    }
+}
 
 #define SET_TOK_AND_RET(tok)                                                                                 \
     do {                                                                                                     \
@@ -35,12 +40,16 @@ static inline char escape_code(char c) {
 }
 
 int Scanner::next() {
+    current_tok = INVALID;
+
     const char *p = _text.data();
-    const char *e = _text.data() + _text.size();
+    const char *e = _text.data() + _text.size() - 1;
+
     p += offset;
     if (p == e) {
         SET_TOK_AND_RET(EOFS);
     }
+
     if (!(mode & SCAN_SPACES)) {
         while (p != e && (*p == ' ' || *p == '\t' || *p == '\n')) {
             if (*p == '\n') {
@@ -107,7 +116,8 @@ int Scanner::next() {
         int ret = INT;
         token_start = p - _text.data();
         current_int = strtol(p, (char **)&endp, 0);
-        if (endp != e && *endp == '.' && (mode & SCAN_FLOATS)) {
+        // Float? Must also see if it's not a `..` operator.
+        if (endp != e && *endp == '.' && (mode & SCAN_FLOATS) && !((endp + 1) != e && endp[1] == '.')) {
             current_float = strtod(p, (char **)&endp);
             ret = FLOAT;
         }
@@ -125,19 +135,24 @@ int Scanner::next() {
                             (*p >= '0' && *p <= '9')));
         SET_TOK_AND_RET(IDENT);
     }
+
     if (*p == '\n') {
         ++line;
         col = 0;
     }
-    token_start = p - _text.data();
-    ++offset;
-    ++col;
+
     if ((mode & SCAN_SPACES) && (*p == ' ' || *p == '\t' || *p == '\n')) {
+        token_start = p - _text.data();
+        ++offset;
+        ++col;
+
         SET_TOK_AND_RET(*p);
     }
     if (*p == '\\' && (mode & SCAN_ESCAPES)) {
+        token_start = p - _text.data();
         ++p;
         ++offset;
+        ++col;
         if (p == e) {
             SET_TOK_AND_RET(EOFS);
         }
@@ -148,6 +163,18 @@ int Scanner::next() {
         char c = escape_code(*p);
         SET_TOK_AND_RET(c);
     }
+
+    if (*p == '.' && (p + 1) != e && p[1] == '.') {
+        p += 2;
+        offset += 2;
+        col += 2;
+        SET_TOK_AND_RET(RANGE_DELIM);
+    }
+
+    // Single character
+    token_start = p - _text.data();
+    ++col;
+    ++offset;
     SET_TOK_AND_RET(*p);
 }
 

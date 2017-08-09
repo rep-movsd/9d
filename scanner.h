@@ -17,7 +17,8 @@ const int SPACE = -5;
 const int COMMENT = -6;
 const int EOFS = -7;
 const int ESCAPE = -8;
-const int INVALID = -9;
+const int RANGE_DELIM = -9; // '..' operator
+const int INVALID = -10;
 
 enum Modes {
     SCAN_INTS = 1 << -INT,         // Scan integers?

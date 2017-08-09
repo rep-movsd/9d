@@ -1,9 +1,10 @@
 #include "config.h"
 #include "scanner.h"
 
+#include <exception>
+#include <iostream>
 #include <stdarg.h>
 #include <string.h>
-#include <exception>
 
 constexpr int MAX_SUBSCRIPT = 1024;
 
@@ -31,13 +32,21 @@ struct Parser {
             if (strcmp(token_text.c_str(), KEYWORD_LIST[i]) == 0) {
                 return true;
             }
-            return false;
         }
+        return false;
     }
 
     struct Range {
         int start;
         int end; // inclusive. start == end for 1 channel input or output
+
+        void dump(std::ostream &o) const {
+            if (start != end) {
+                o << "[" << start << " .. " << end << "]";
+            } else {
+                o << "[" << start << "]";
+            }
+        }
     };
 
     using UnsubscriptedPin = std::string;
@@ -45,16 +54,38 @@ struct Parser {
     struct MaybeSubscriptedEndpoint {
         UnsubscriptedPin pin;
         optional<Range> subscript;
+
+        void dump(std::ostream &o) const {
+            o << pin;
+            if (subscript) {
+                subscript.value().dump(o);
+            }
+        }
     };
 
     struct Connection {
         MaybeSubscriptedEndpoint left;
         MaybeSubscriptedEndpoint right;
+
+        void dump(std::ostream &o) const {
+            left.dump(o);
+            o << " = ";
+            right.dump(o);
+        }
     };
 
     struct Part {
         std::string chip;
         std::vector<Connection> connections;
+
+        void dump(std::ostream &o) const {
+            o << chip << "(";
+            for (auto &conn : connections) {
+                conn.dump(o);
+                o << ", ";
+            }
+            o << ")";
+        }
     };
 
     using PartsList = std::vector<Part>;
@@ -67,6 +98,13 @@ struct Parser {
     struct PinDeclaration {
         std::string pin;
         uint32_t width = 1;
+
+        void dump(std::ostream &o) const {
+            o << pin;
+            if (width > 1) {
+                o << "[" << width << "]";
+            }
+        }
     };
 
     struct Chip {
@@ -76,6 +114,49 @@ struct Parser {
         std::vector<Part> parts;
         BuiltinChipsList builtin_chips;
         ClockedPinList clocked_pins;
+
+        void dump(std::ostream &o) const {
+            o << "CHIP " << name << " {\n";
+
+            auto print_decls = [&](const std::vector<Parser::PinDeclaration> &decls) {
+                for (auto &d : decls) {
+                    o << d.pin;
+                    if (d.width > 1) {
+                        o << "[" << d.width << "]";
+                    }
+                    o << ",";
+                }
+                o << ";";
+            };
+
+            o << "IN ";
+            print_decls(in_pins);
+            o << "\n";
+
+            o << "OUT ";
+            print_decls(out_pins);
+            o << "\n";
+
+            o << "BUILTIN ";
+
+            for (auto &chip : builtin_chips) {
+                o << chip << ", ";
+            }
+            o << ";\n";
+
+            for (auto &pin : clocked_pins) {
+                o << pin << ", ";
+            }
+            o << ";\n";
+
+            o << "PARTS: \n";
+
+            for (auto &p : parts) {
+                p.dump(o);
+                o << ";\n";
+            }
+            o << "}\n";
+        }
     };
 
     Chip parse() {
@@ -105,7 +186,7 @@ struct Parser {
                 b[1] = (char)token;
                 desc = b;
             }
-            error("Expected: %s", b);
+            error("Expected token: %s, but got token: %s", desc, scanner::desc(sc.current_tok));
         }
     }
 
@@ -279,6 +360,7 @@ struct Parser {
         conn.left = maybe_subscripted_endpoint();
         skip('=');
         conn.right = maybe_subscripted_endpoint();
+        return conn;
     }
 
     MaybeSubscriptedEndpoint maybe_subscripted_endpoint() {
@@ -289,13 +371,13 @@ struct Parser {
         sc.next();
         Range r = {};
         r.start = integer();
-        if (sc.current_tok == '.') {
+
+        if (sc.current_tok == scanner::RANGE_DELIM) {
             sc.next();
-            skip('.');
             r.end = integer();
             skip(']');
-        } else if (sc.current_tok == ']') {
-            sc.next();
+        } else {
+            skip(']');
             r.end = r.start;
         }
         return MaybeSubscriptedEndpoint{pin, r};
@@ -324,5 +406,5 @@ int main(int argc, char **argv) {
     read_file(argv[1], s);
 
     Parser p(std::move(s));
-    p.parse();
+    p.parse().dump(std::cout);
 }

@@ -43,7 +43,16 @@ The language and platform will be C++ with QT (or perhaps CopperSpice?)
 
 Scripting and codegen tools can be in python or JS etc.
 
+### Values
 
+Only code matters - code that helps the end user get their stuff done.
+How they ought to get the stuff done is a subjective decision which I will take, as creator of the project.
 
+Egos, genders, colors, pleb-ness, pru-ness - all of these are irrelevant.
+
+If the code is good, I let it be, until such time as it is ready to be rewritten in a better way.
+This includes my own code.
+
+Any issues not related to code and end user experience will be deleted promptly.
 
 

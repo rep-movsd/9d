@@ -1,3 +1,3 @@
 #!/bin/sh
 
-g++ -ggdb -fmax-errors=1 hdl_parser.cpp scanner.cpp -o parser_test -lstdc++fs
+g++ -ggdb -std=c++1z -Wall -Wextra -fmax-errors=1 hdl_parser.cpp scanner.cpp -o parser_test

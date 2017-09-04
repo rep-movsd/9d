@@ -17,7 +17,8 @@ const int SPACE = -5;
 const int COMMENT = -6;
 const int EOFS = -7;
 const int ESCAPE = -8;
-const int INVALID = -9;
+const int RANGE_DELIM = -9; // '..' operator
+const int INVALID = -10;
 
 enum Modes {
     SCAN_INTS = 1 << -INT,         // Scan integers?
@@ -27,10 +28,11 @@ enum Modes {
     SCAN_SPACES = 1 << -SPACE,     // Scan white spaces
     SCAN_COMMENTS = 1 << -COMMENT, // Scan comments
     SCAN_ESCAPES = 1 << -ESCAPE,   // This will inteprete escape codes all throughout the string
+    SKIP_COMMENTS = 1 << 31        // Ignore comments
 };
 
 /// This default mode is like scanning most simple languages
-const int DEFAULT_MODE = SCAN_INTS | SCAN_FLOATS | SCAN_STRINGS | SCAN_IDENTS;
+const int DEFAULT_MODE = SCAN_INTS | SCAN_FLOATS | SCAN_STRINGS | SCAN_IDENTS | SKIP_COMMENTS;
 
 /// This mode treats the whole text as if being inside a string literal. It
 /// scans characters one by one and also interpretes escape code

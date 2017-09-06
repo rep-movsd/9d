@@ -39,7 +39,9 @@ My job will be to create task based issues and let people pick what they feel co
 
 There is bound to be a lot of code churn and rewriting involved in such a large project. Until specified, treat your code as likely to be re-architected (or rewritten).
 
-The language and platform will be C++ with QT (or perhaps CopperSpice?)
+After some consideration, it is decided that the project will be multi-lingual - C++ will be used for the engine and GUI will be built in Lazarus/FreePascal which is a free/libre development environment closely matching Delphi
+
+A web UI may be provided for some tools.
 
 Scripting and codegen tools can be in python or JS etc.
 

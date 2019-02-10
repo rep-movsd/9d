@@ -17,6 +17,7 @@ using xor_gate = gate<0, 1, 1, 0>;
 // Extract the nth bit of a number as 1 or 0
 #define EXTRACT_BIT(i, n) (i & (1 << n)) >> n
 
+
 int main()
 {
   // Build a cascaded 4 bit xor gate by combining
@@ -30,23 +31,27 @@ int main()
   
   // this leaves x.a, x,b, y.b and z.b as inputs
   
-  // test it
+  // Iterate over all the 16 combinations
   for(unsigned int i = 0; i < 16; ++i)
   {
+    // Separate each bit of i into bits[]
     Bit bits[4];
     for(int j = 0; j < 4; ++j)
     {
       bits[j] = EXTRACT_BIT(i, j);
     }
     
+    // Send the bit into each pin 
     x.a(bits[0]);
     x.b(bits[1]);
     y.b(bits[2]);
     z.b(bits[3]);
     
+    // Print the bits
     for(int j = 0; j < 4; ++j)
       cout << bits[j];
   
+    // Print the output of the gate
     cout << " " << z.out.signal() << endl;
   }
 }
